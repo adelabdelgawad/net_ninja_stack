@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Table</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .table-container { margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dddddd; text-align: left; padding: 8px; }
+        th { background-color: #ffa500; color: white; text-align: center; }
+        .header-row th { text-align: center; }
+        .data-row td { text-align: center; }
+        .high-usage { background-color: #ffcccc !important; }
+        .low-balance { background-color: #ffeb99 !important; }
+    </style>
+</head>
+<body>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr class="header-row">
+                    <th colspan="4">LineBase Information</th>
+                    <th colspan="2">Speedtest</th>
+                    <th colspan="4">Quota Results</th>
+                </tr>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>ISP</th>
+                    <th>Description</th>
+                    <th>Download</th>
+                    <th>Upload</th>
+                    <th>Used</th>
+                    <th>Remaining</th>
+                    <th>Renewal Date</th>
+                    <th>Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                    
+                    <tr class="data-row" 
+                        style="">
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td> Mbps</td>
+                        <td> Mbps</td>
+                        <td>None (None%)</td>
+                        <td>None GB</td>
+                        <td>None</td>
+                        <td>None LE</td>
+                    </tr>
+                
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

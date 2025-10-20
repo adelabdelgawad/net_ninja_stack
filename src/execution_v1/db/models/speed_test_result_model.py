@@ -20,7 +20,6 @@ class SpeedTestResultModel:
         self,
         line_id: Optional[int] = None,
         id: Optional[int] = None,
-        process_id: Optional[str] = None,
     ) -> Optional[SpeedTestResult]:
         """
         Read a single SpeedTestResult record based on provided filters.
@@ -28,7 +27,6 @@ class SpeedTestResultModel:
         Args:
             line_id: Optional line ID to filter by
             id: Optional speed test result ID to filter by
-            process_id: Optional process ID to filter by
 
         Returns:
             SpeedTestResult object if found, None otherwise
@@ -40,10 +38,6 @@ class SpeedTestResultModel:
                 statement = statement.where(SpeedTestResult.id == id)
             if line_id is not None:
                 statement = statement.where(SpeedTestResult.line_id == line_id)
-            if process_id is not None:
-                statement = statement.where(
-                    SpeedTestResult.process_id == process_id
-                )
 
             result = await self.session.execute(statement)
             speed_test = result.scalar_one_or_none()
@@ -51,12 +45,12 @@ class SpeedTestResultModel:
             if speed_test:
                 logger.info(
                     f"Successfully retrieved SpeedTestResult with filters: "
-                    f"id={id}, line_id={line_id}, process_id={process_id}"
+                    f"id={id}, line_id={line_id}"
                 )
             else:
                 logger.warning(
                     f"No SpeedTestResult found with filters: "
-                    f"id={id}, line_id={line_id}, process_id={process_id}"
+                    f"id={id}, line_id={line_id}"
                 )
 
             return speed_test
@@ -183,7 +177,7 @@ class SpeedTestResultModel:
 
             logger.info(
                 f"Successfully created SpeedTestResult with id={speed_test.id}, "
-                f"line_id={speed_test.line_id}, process_id={speed_test.process_id}"
+                f"line_id={speed_test.line_id}"
             )
 
             return speed_test

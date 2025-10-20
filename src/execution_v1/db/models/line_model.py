@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from db.model import Line
 
@@ -117,16 +118,17 @@ class LineModel:
 
     async def read_all(self, isp_id: Optional[int] = None) -> List[Line]:
         """
-        Read all Line records, optionally filtered by isp_id.
+        Read all Line records with eager-loaded ISP relationship, optionally filtered by isp_id.
 
         Args:
             isp_id: Optional ISP ID to filter by
 
         Returns:
-            List of Line objects
+            List of Line objects with ISP data loaded
         """
         try:
-            statement = select(Line)
+            # Use eager loading to avoid N+1 queries
+            statement = select(Line).options(selectinload(Line.isp))
 
             if isp_id is not None:
                 statement = statement.where(Line.isp_id == isp_id)

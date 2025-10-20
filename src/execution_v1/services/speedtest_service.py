@@ -29,31 +29,28 @@ class SpeedTestService:
         upload = 0.0
 
         try:
-            await logger.info(st.process_id, "Getting Configurations")
+            logger.info(f"Getting speedtest config for {line.name}")
             if await st.get_config():
-                await logger.info(st.process_id, "Finding best server")
+                logger.info(f"Finding best server for {line.name}")
                 await st.get_best_server()
 
-                await logger.info(st.process_id, "Measuring latency")
+                logger.info(f"Measuring latency for {line.name}")
                 await st.measure_latency()
 
-                await logger.info(st.process_id, "Starting download test")
+                logger.info(f"Starting download test for {line.name}")
                 await st.measure_download_speed()
 
-                await logger.info(st.process_id, "Starting upload test")
+                logger.info(f"Starting upload test for {line.name}")
                 await st.measure_upload_speed()
 
                 download = round(st.download * 8 / (1024 * 1024), 2)
                 upload = round(st.upload * 8 / (1024 * 1024), 2)
             else:
-                await logger.error(
-                    st.process_id, "Could not connect to Ookla's Servers."
-                )
+                logger.error(f"Could not connect to Ookla's Servers for {line.name}")
         finally:
             # Save result regardless of success/failure
             result = SpeedTestResult(
                 line_id=line.id,
-                process_id=st.process_id,
                 ping=st.ping,
                 upload_speed=upload,
                 download_speed=download,

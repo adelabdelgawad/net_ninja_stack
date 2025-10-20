@@ -20,7 +20,6 @@ class QuotaResultModel:
         self,
         line_id: Optional[int] = None,
         id: Optional[int] = None,
-        process_id: Optional[str] = None,
     ) -> Optional[QuotaResult]:
         """
         Read a single QuotaResult record based on provided filters.
@@ -28,7 +27,6 @@ class QuotaResultModel:
         Args:
             line_id: Optional line ID to filter by
             id: Optional quota result ID to filter by
-            process_id: Optional process ID to filter by
 
         Returns:
             QuotaResult object if found, None otherwise
@@ -40,10 +38,6 @@ class QuotaResultModel:
                 statement = statement.where(QuotaResult.id == id)
             if line_id is not None:
                 statement = statement.where(QuotaResult.line_id == line_id)
-            if process_id is not None:
-                statement = statement.where(
-                    QuotaResult.process_id == process_id
-                )
 
             result = await self.session.execute(statement)
             quota_result = result.scalar_one_or_none()
@@ -51,12 +45,12 @@ class QuotaResultModel:
             if quota_result:
                 logger.info(
                     f"Successfully retrieved QuotaResult with filters: "
-                    f"id={id}, line_id={line_id}, process_id={process_id}"
+                    f"id={id}, line_id={line_id}"
                 )
             else:
                 logger.warning(
                     f"No QuotaResult found with filters: "
-                    f"id={id}, line_id={line_id}, process_id={process_id}"
+                    f"id={id}, line_id={line_id}"
                 )
 
             return quota_result
@@ -181,7 +175,7 @@ class QuotaResultModel:
 
             logger.info(
                 f"Successfully created QuotaResult with id={quota_result.id}, "
-                f"line_id={quota_result.line_id}, process_id={quota_result.process_id}"
+                f"line_id={quota_result.line_id}"
             )
 
             return quota_result

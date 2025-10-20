@@ -1,15 +1,17 @@
 import asyncio
+import logging
 import re
-import uuid
 from typing import Optional
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium_async import Options, launch
 
-from app.logger import logger
 from app.wait import WebDriverWait
+from core.scraper_config import timeouts, we_selectors
 from db.model import Line, QuotaResult
+
+logger = logging.getLogger(__name__)
 
 
 # WEWebScraper class
@@ -24,7 +26,6 @@ class WEWebScraper:
         headless: Optional[bool] = False,
     ) -> None:
         """Initialize with line details and headless option"""
-        self.pid = str(uuid.uuid4())  # Generate a unique process ID
         self.line = line
         self.headless = headless
 
@@ -43,22 +44,19 @@ class WEWebScraper:
         self.succeed = False
 
     async def __aenter__(self):
-        await logger.info(self.pid, f"Launching browser for {self.line.name}.")
+        logger.info(f"Launching browser for {self.line.name}")
         self.driver = await launch(options=Options(headless=self.headless))
         return self
 
     async def __aexit__(self, *args, **kwargs):
-        await logger.info(self.pid, f"Closing browser for {self.line.name}.")
+        logger.info(f"Closing browser for {self.line.name}")
         self.driver.quit()
         if not self.succeed:
-            await logger.warning(
-                self.pid, f"Scraping failed for {self.line.name}."
-            )
+            logger.warning(f"Scraping failed for {self.line.name}")
             if self.line not in self.failed_list:
                 self.failed_list.append(self.line)
         self.result = QuotaResult(
             line_id=self.line.id,
-            process_id=self.pid,
             data_used=self.used,
             usage_percentage=self.used_perc,
             data_remaining=self.remaining,
@@ -70,144 +68,119 @@ class WEWebScraper:
 
     async def login(self) -> bool:
         try:
-            await logger.info(self.pid, f"Logging in for {self.line.name}.")
+            logger.info(f"Logging in for {self.line.name}")
             self.driver.get("https://my.te.eg/user/login")
-            await WebDriverWait(self.driver, 5).until(
+            await WebDriverWait(self.driver, timeouts.login_wait).until(
                 EC.presence_of_element_located(
-                    (By.ID, "login_loginid_input_01")
+                    (By.ID, we_selectors.login_id)
                 )
             )
 
             # Input credentials
-            self.driver.find_element(By.ID, "login_loginid_input_01").click()
+            self.driver.find_element(By.ID, we_selectors.login_id).click()
             self.driver.find_element(
-                By.ID, "login_loginid_input_01"
+                By.ID, we_selectors.login_id
             ).send_keys(self.line.portal_username)
-            self.driver.find_element(By.ID, "login_input_type_01").click()
+            self.driver.find_element(By.ID, we_selectors.login_type).click()
             self.driver.find_element(
                 By.CSS_SELECTOR,
-                ".ant-select-item-option-active .ant-space-item:nth-child(2) > span",
+                we_selectors.account_type_selector,
             ).click()
-            self.driver.find_element(By.ID, "login_password_input_01").click()
+            self.driver.find_element(By.ID, we_selectors.login_password).click()
             self.driver.find_element(
-                By.ID, "login_password_input_01"
-            ).send_keys(self.line.portal_password)
-            self.driver.find_element(By.ID, "login-withecare").click()
-            await asyncio.sleep(0.5)
-            await logger.info(
-                self.pid, f"{self.line.name} logged in successfully."
-            )
+                By.ID, we_selectors.login_password
+            ).send_keys(self.line.get_password())  # Use decrypted password
+            self.driver.find_element(By.ID, we_selectors.login_button).click()
+            await asyncio.sleep(timeouts.post_action_delay)
+            logger.info(f"{self.line.name} logged in successfully")
             return True
         except Exception as e:
-            await logger.error(
-                self.pid, f"Login failed for {self.line.name}: {e}"
-            )
+            logger.error(f"Login failed for {self.line.name}: {e}")
             return False
 
     async def scrap_overview_page(self) -> bool:
-        await logger.info(
-            self.pid, f"Navigating to overview page for {self.line.name}."
-        )
+        logger.info(f"Navigating to overview page for {self.line.name}")
         await asyncio.sleep(1)  # Adjust based on observed page load times
         try:
             self.driver.get("https://my.te.eg/offering/overview")
-            await asyncio.sleep(0.5)
-            _balance_selector = "#_bes_window > main > div > div > div.ant-row > div:nth-child(2) > div > div > div > div > div:nth-child(3) > div:nth-child(1)"
-            _used_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-24 > div > div > div.ant-row.ec_accountoverview_primaryBtn_Qyg-Vp > div:nth-child(2) > div > div > div.slick-list > div > div.slick-slide.slick-active.slick-current > div > div > div > div > div:nth-child(2) > div:nth-child(2) > span:nth-child(1)"
-            _remaining_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-24 > div > div > div.ant-row.ec_accountoverview_primaryBtn_Qyg-Vp > div:nth-child(2) > div > div > div.slick-list > div > div.slick-slide.slick-active.slick-current > div > div > div > div > div:nth-child(2) > div:nth-child(1) > span:nth-child(1)"
+            await asyncio.sleep(timeouts.post_action_delay)
 
-            await WebDriverWait(self.driver, 7).until(
+            await WebDriverWait(self.driver, timeouts.page_load_wait).until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, _balance_selector)
+                    (By.CSS_SELECTOR, we_selectors.balance)
                 )
             )
-            await logger.debug(
-                self.pid,
-                f"Overview page loaded successfully for {self.line.name}.",
-            )
+            logger.debug(f"Overview page loaded successfully for {self.line.name}")
 
-            await asyncio.sleep(2)
+            await asyncio.sleep(timeouts.element_wait)
 
             # Extracting values from the page
             self.balance = self.driver.find_element(
-                By.CSS_SELECTOR, _balance_selector
+                By.CSS_SELECTOR, we_selectors.balance
             ).text.replace(",", "")
             self.used = float(
                 self.driver.find_element(
-                    By.CSS_SELECTOR, _used_selector
+                    By.CSS_SELECTOR, we_selectors.data_used
                 ).text.replace(",", "")
             )
             self.remaining = float(
                 self.driver.find_element(
-                    By.CSS_SELECTOR, _remaining_selector
+                    By.CSS_SELECTOR, we_selectors.data_remaining
                 ).text.replace(",", "")
             )
             self.used_perc = await self._calc_used_perc(
                 self.used, self.remaining
             )
 
-            await logger.info(
-                self.pid,
-                f"Extracted values for {self.line.name} - Balance: {self.balance}, Used: {self.used}, Remaining: {self.remaining}, Usage Percentage: {self.used_perc}%",
+            logger.info(
+                f"Extracted values for {self.line.name} - Balance: {self.balance}, Used: {self.used}, Remaining: {self.remaining}, Usage Percentage: {self.used_perc}%"
             )
             self.succeed = True
             return True
         except Exception as e:
-            await logger.error(
-                self.pid,
-                f"Error extracting overview page for {self.line.name}: {e}",
+            logger.error(
+                f"Error extracting overview page for {self.line.name}: {e}"
             )
             return False
 
     async def scrap_renewaldate_page(self) -> bool:
-        await logger.info(
-            self.pid, f"Navigating to renewal page for {self.line.name}."
-        )
+        logger.info(f"Navigating to renewal page for {self.line.name}")
 
         try:
             self.driver.get("https://my.te.eg/echannel/#/overview")
-            _renewal_cost_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-xs-24.ant-col-sm-24.ant-col-md-14.ant-col-lg-14.ant-col-xl-14 > div > div > div > div > div:nth-child(3) > div > span:nth-child(2) > div > div:nth-child(1)"
-            _renewal_date_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-xs-24.ant-col-sm-24.ant-col-md-14.ant-col-lg-14.ant-col-xl-14 > div > div > div > div > div:nth-child(4) > div > span"
 
-            await WebDriverWait(self.driver, 7).until(
+            await WebDriverWait(self.driver, timeouts.page_load_wait).until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, _renewal_cost_selector)
+                    (By.CSS_SELECTOR, we_selectors.renewal_cost)
                 )
             )
-            await asyncio.sleep(2)
-            await logger.debug(
-                self.pid,
-                f"Renewal page loaded successfully for {self.line.name}.",
-            )
+            await asyncio.sleep(timeouts.element_wait)
+            logger.debug(f"Renewal page loaded successfully for {self.line.name}")
 
             # Extracting renewal cost and date
             self.renewal_cost = float(
                 self.driver.find_element(
-                    By.CSS_SELECTOR, _renewal_cost_selector
+                    By.CSS_SELECTOR, we_selectors.renewal_cost
                 ).text.replace(",", "")
             )
             renewal_date_element = self.driver.find_element(
-                By.CSS_SELECTOR, _renewal_date_selector
+                By.CSS_SELECTOR, we_selectors.renewal_date
             ).text
             await self._set_renewal_date(renewal_date_element)
 
-            await logger.info(
-                self.pid,
-                f"Extracted renewal cost and date for {self.line.name} - Renewal Cost: {self.renewal_cost}, Renewal Date: {self.renewal_date}, Remaining Days: {self.remaining_days}",
+            logger.info(
+                f"Extracted renewal cost and date for {self.line.name} - Renewal Cost: {self.renewal_cost}, Renewal Date: {self.renewal_date}, Remaining Days: {self.remaining_days}"
             )
             self.succeed = True
             return True
         except Exception as e:
-            await logger.error(
-                self.pid,
-                f"Error extracting renewal page for {self.line.name}: {e}",
+            logger.error(
+                f"Error extracting renewal page for {self.line.name}: {e}"
             )
             return False
 
     async def _set_renewal_date(self, renewal_date_element: str):
-        await logger.debug(
-            self.pid, f"Setting renewal date for {self.line.name}."
-        )
+        logger.debug(f"Setting renewal date for {self.line.name}")
         try:
             if renewal_date_element:
                 match = re.search(
@@ -218,9 +191,8 @@ class WEWebScraper:
                     self.renewal_date = match.group(1)
                     self.remaining_days = int(match.group(2))
         except Exception as e:
-            await logger.error(
-                self.pid,
-                f"Error setting renewal date for {self.line.name}: {e}",
+            logger.error(
+                f"Error setting renewal date for {self.line.name}: {e}"
             )
 
     async def _calc_used_perc(self, used: float, remaining: float) -> float:
@@ -228,8 +200,7 @@ class WEWebScraper:
             total = used + remaining
             return (used / total) * 100
         except ZeroDivisionError:
-            await logger.error(
-                self.pid,
-                f"Division by zero error for {self.line.name}. Used: {used}, Remaining: {remaining}",
+            logger.error(
+                f"Division by zero error for {self.line.name}. Used: {used}, Remaining: {remaining}"
             )
             return 0.0

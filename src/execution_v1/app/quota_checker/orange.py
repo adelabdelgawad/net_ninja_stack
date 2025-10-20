@@ -1,23 +1,22 @@
 import asyncio
+import logging
 import re
-import uuid
+from datetime import datetime
 from typing import Optional
 
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium_async import Options, launch
 
-from app.logger import logger
 from app.wait import WebDriverWait
+from core.scraper_config import orange_selectors, timeouts
 from db.model import Line, QuotaResult
 
+logger = logging.getLogger(__name__)
 
-# WEWebScraper class
-class OrangeScrapper:
-    """WE Scraping Base Class"""
+
+class OrangeWebScraper:
+    """Orange Egypt Scraping Class"""
 
     failed_list = []
 
@@ -27,282 +26,274 @@ class OrangeScrapper:
         headless: Optional[bool] = False,
     ) -> None:
         """Initialize with line details and headless option"""
-        self.pid = str(uuid.uuid4())  # Generate a unique process ID
         self.line = line
         self.headless = headless
 
-        # Page contents
-        self.overview_page_content = None
-        self.renewaldate_page_content = None
-
         # Parsed values
-        self.used = None
-        self.remaining = None
         self.balance = None
-        self.used_perc = None
+        self.expiry_date = None
+        self.total_consumption = None
+        self.remaining = None
+        self.used = None
         self.renewal_date = None
         self.remaining_days = None
-        self.renewal_cost = None
+        self.used_perc = None
         self.succeed = False
 
     async def __aenter__(self):
-        await logger.info(self.pid, f"Launching browser for {self.line.name}.")
+        logger.info(f"Launching browser for {self.line.name}")
         self.driver = await launch(options=Options(headless=self.headless))
         return self
 
     async def __aexit__(self, *args, **kwargs):
-        await logger.info(self.pid, f"Closing browser for {self.line.name}.")
-        self.driver.quit()
+        logger.info(f"Closing browser for {self.line.name}")
+        if self.driver:
+            self.driver.quit()
         if not self.succeed:
-            await logger.warning(
-                self.pid, f"Scraping failed for {self.line.name}."
-            )
+            logger.warning(f"Scraping failed for {self.line.name}")
             if self.line not in self.failed_list:
                 self.failed_list.append(self.line)
         self.result = QuotaResult(
             line_id=self.line.id,
-            process_id=self.pid,
             data_used=self.used,
             usage_percentage=self.used_perc,
             data_remaining=self.remaining,
             balance=self.balance,
             renewal_date=self.renewal_date,
             remaining_days=self.remaining_days,
-            renewal_cost=self.renewal_cost,
+            renewal_cost=None,  # Not available for Orange
         )
 
     async def login(self) -> bool:
-        """
-        Logs into Orange Egypt portal using credentials from self.line.
-        Returns True if login successful, False otherwise.
-        """
         try:
-            await logger.info(self.pid, f"Logging in for {self.line.name}.")
+            logger.info(f"Logging in for {self.line.name}")
+            self.driver.get("https://www.orange.eg/ar/myaccount/login")
 
-            # Navigate to Orange Egypt portal
-            self.driver.get("https://www.orange.eg/ar/")
-
-            # Set window size for consistent element visibility
-            self.driver.set_window_size(1382, 744)
-
-            # Wait for and click "Sign In" button
-            await WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable(
-                    (By.ID, "GSM_Portal_TopHeader_lblSignIn")
-                )
-            )
-            self.driver.find_element(
-                By.ID, "GSM_Portal_TopHeader_lblSignIn"
-            ).click()
-
-            # Wait for login form to appear
-            await WebDriverWait(self.driver, 10).until(
+            # Wait for dial number input to be present
+            await WebDriverWait(self.driver, timeouts.login_wait).until(
                 EC.presence_of_element_located(
-                    (By.ID, "PlaceHolderAppsHP_LoginControl_txtDialNumber")
+                    (By.ID, orange_selectors.login_dial_number)
                 )
             )
 
-            # Input phone number (username)
-            phone_input = self.driver.find_element(
-                By.ID, "PlaceHolderAppsHP_LoginControl_txtDialNumber"
+            # Input dial number
+            dial_number_input = self.driver.find_element(
+                By.ID, orange_selectors.login_dial_number
             )
-            phone_input.click()
-            phone_input.clear()
-            phone_input.send_keys(self.line.portal_username)
+            dial_number_input.click()
+            dial_number_input.send_keys(self.line.portal_username)
 
-            # Wait briefly for any auto-complete/validation
-            await asyncio.sleep(0.3)
+            # Dispatch input and change events using JavaScript
+            self.driver.execute_script(
+                "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));"
+                "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));",
+                dial_number_input,
+            )
 
             # Input password
             password_input = self.driver.find_element(
-                By.ID, "PlaceHolderAppsHP_LoginControl_txtPassword"
+                By.ID, orange_selectors.login_password
             )
             password_input.click()
-            password_input.clear()
-            password_input.send_keys(self.line.portal_password)
+            password_input.send_keys(self.line.get_password())
 
-            # Submit form by pressing Enter
-            password_input.send_keys(Keys.ENTER)
-
-            # Wait for login to complete (adjust timeout as needed)
-            await asyncio.sleep(1.5)
-
-            # Verify successful login by checking for logged-in state indicator
-            # (adjust selector based on what appears after successful login)
-            try:
-                await WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located(
-                        (
-                            By.ID,
-                            "GSM_Portal_TopHeader_lblSignOut",
-                        )  # Or another post-login element
-                    )
-                )
-                await logger.info(
-                    self.pid, f"{self.line.name} logged in successfully."
-                )
-                return True
-            except:
-                # Check if we're still on login page (login failed)
-                if (
-                    "PlaceHolderAppsHP_LoginControl_txtDialNumber"
-                    in self.driver.page_source
-                ):
-                    await logger.error(
-                        self.pid,
-                        f"Login failed for {self.line.name}: Still on login page",
-                    )
-                    return False
-                # Assume success if we're not on login page
-                await logger.info(
-                    self.pid, f"{self.line.name} logged in successfully."
-                )
-                return True
-
-        except TimeoutException as e:
-            await logger.error(
-                self.pid,
-                f"Login timeout for {self.line.name}: Element not found - {e}",
+            # Dispatch input and change events using JavaScript
+            self.driver.execute_script(
+                "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));"
+                "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));",
+                password_input,
             )
-            return False
-        except NoSuchElementException as e:
-            await logger.error(
-                self.pid,
-                f"Login failed for {self.line.name}: Element not found - {e}",
+
+            # Wait briefly for button to potentially enable
+            await asyncio.sleep(0.2)
+
+            # Click login button
+            login_button = self.driver.find_element(
+                By.ID, orange_selectors.login_button
             )
-            return False
+
+            if login_button.is_enabled():
+                login_button.click()
+                await asyncio.sleep(timeouts.post_action_delay)
+                logger.info(f"{self.line.name} logged in successfully")
+                return True
+            else:
+                logger.warning(
+                    f"Login button is disabled for {self.line.name}"
+                )
+                return False
+
         except Exception as e:
-            await logger.error(
-                self.pid, f"Login failed for {self.line.name}: {e}"
+            logger.error(f"Login failed for {self.line.name}: {e}")
+            return False
+
+    async def scrap_balance_page(self) -> bool:
+        """Scrape balance and expiry date from account overview"""
+        logger.info(f"Navigating to balance page for {self.line.name}")
+
+        try:
+            self.driver.get("https://www.orange.eg/ar/myaccount/")
+
+            await WebDriverWait(self.driver, timeouts.page_load_wait).until(
+                EC.presence_of_element_located(
+                    (By.ID, orange_selectors.balance_container)
+                )
+            )
+            await asyncio.sleep(timeouts.element_wait)
+            logger.debug(
+                f"Balance page loaded successfully for {self.line.name}"
+            )
+
+            # Extract balance
+            balance_container = self.driver.find_element(
+                By.ID, orange_selectors.balance_container
+            )
+            raw_balance_text = balance_container.text.strip()
+            balance_match = re.search(r"\d+", raw_balance_text)
+            self.balance = (
+                float(balance_match.group(0)) if balance_match else None
+            )
+
+            # Extract expiry date
+            expiry_container = self.driver.find_element(
+                By.ID, orange_selectors.expiry_date_container
+            )
+            raw_expiry_text = expiry_container.text.strip()
+            # Remove "صالح حتى" (valid until) prefix
+            self.expiry_date = re.sub(
+                r"^صالح حتى\s*", "", raw_expiry_text, flags=re.IGNORECASE
+            ).strip()
+
+            logger.info(
+                f"Extracted balance for {self.line.name} - Balance: {self.balance}, Expiry: {self.expiry_date}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Error extracting balance page for {self.line.name}: {e}"
             )
             return False
 
-    async def scrap_overview_page(self) -> bool:
-        await logger.info(
-            self.pid, f"Navigating to overview page for {self.line.name}."
-        )
-        await asyncio.sleep(1)  # Adjust based on observed page load times
-        try:
-            self.driver.get("https://my.te.eg/offering/overview")
-            await asyncio.sleep(0.5)
-            _balance_selector = "#_bes_window > main > div > div > div.ant-row > div:nth-child(2) > div > div > div > div > div:nth-child(3) > div:nth-child(1)"
-            _used_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-24 > div > div > div.ant-row.ec_accountoverview_primaryBtn_Qyg-Vp > div:nth-child(2) > div > div > div.slick-list > div > div.slick-slide.slick-active.slick-current > div > div > div > div > div:nth-child(2) > div:nth-child(2) > span:nth-child(1)"
-            _remaining_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-24 > div > div > div.ant-row.ec_accountoverview_primaryBtn_Qyg-Vp > div:nth-child(2) > div > div > div.slick-list > div > div.slick-slide.slick-active.slick-current > div > div > div > div > div:nth-child(2) > div:nth-child(1) > span:nth-child(1)"
+    async def scrap_internet_page(self) -> bool:
+        """Scrape internet consumption data"""
+        logger.info(f"Navigating to internet page for {self.line.name}")
 
-            await WebDriverWait(self.driver, 7).until(
+        try:
+            self.driver.get("https://www.orange.eg/ar/myaccount/internet")
+
+            await WebDriverWait(self.driver, timeouts.page_load_wait).until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, _balance_selector)
+                    (By.CSS_SELECTOR, orange_selectors.total_consumption)
                 )
             )
-            await logger.debug(
-                self.pid,
-                f"Overview page loaded successfully for {self.line.name}.",
+            await asyncio.sleep(timeouts.element_wait)
+            logger.debug(
+                f"Internet page loaded successfully for {self.line.name}"
             )
 
-            await asyncio.sleep(2)
+            # Extract total consumption
+            total_elem = self.driver.find_element(
+                By.CSS_SELECTOR, orange_selectors.total_consumption
+            )
+            raw_total = total_elem.text.strip()
+            self.total_consumption = float(
+                re.sub(r"GB", "", raw_total, flags=re.IGNORECASE).strip()
+            )
 
-            # Extracting values from the page
-            self.balance = self.driver.find_element(
-                By.CSS_SELECTOR, _balance_selector
-            ).text.replace(",", "")
-            self.used = float(
-                self.driver.find_element(
-                    By.CSS_SELECTOR, _used_selector
-                ).text.replace(",", "")
+            # Extract remaining (in MB, convert to GB)
+            remaining_elem = self.driver.find_element(
+                By.CSS_SELECTOR, orange_selectors.data_remaining
             )
-            self.remaining = float(
-                self.driver.find_element(
-                    By.CSS_SELECTOR, _remaining_selector
-                ).text.replace(",", "")
+            remaining_mb_text = remaining_elem.text.strip()
+            remaining_mb = float(
+                re.sub(
+                    r"MBs?", "", remaining_mb_text, flags=re.IGNORECASE
+                ).strip()
             )
+            self.remaining = remaining_mb / 1000  # Convert to GB
+
+            # Calculate used
+            self.used = self.total_consumption - self.remaining
+
+            # Calculate usage percentage
             self.used_perc = await self._calc_used_perc(
                 self.used, self.remaining
             )
 
-            await logger.info(
-                self.pid,
-                f"Extracted values for {self.line.name} - Balance: {self.balance}, Used: {self.used}, Remaining: {self.remaining}, Usage Percentage: {self.used_perc}%",
+            # Extract renewal date
+            renewal_elem = self.driver.find_element(
+                By.CSS_SELECTOR, orange_selectors.renewal_date
+            )
+            self.renewal_date = renewal_elem.text.strip()
+
+            # Calculate remaining days
+            self.remaining_days = await self._calc_remaining_days(
+                self.renewal_date
+            )
+
+            logger.info(
+                f"Extracted internet data for {self.line.name} - Total: {self.total_consumption}GB, "
+                f"Used: {self.used}GB, Remaining: {self.remaining}GB, Usage: {self.used_perc}%, "
+                f"Renewal: {self.renewal_date}, Remaining Days: {self.remaining_days}"
             )
             self.succeed = True
             return True
+
         except Exception as e:
-            await logger.error(
-                self.pid,
-                f"Error extracting overview page for {self.line.name}: {e}",
+            logger.error(
+                f"Error extracting internet page for {self.line.name}: {e}"
             )
             return False
-
-    async def scrap_renewaldate_page(self) -> bool:
-        await logger.info(
-            self.pid, f"Navigating to renewal page for {self.line.name}."
-        )
-
-        try:
-            self.driver.get("https://my.te.eg/echannel/#/overview")
-            _renewal_cost_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-xs-24.ant-col-sm-24.ant-col-md-14.ant-col-lg-14.ant-col-xl-14 > div > div > div > div > div:nth-child(3) > div > span:nth-child(2) > div > div:nth-child(1)"
-            _renewal_date_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-xs-24.ant-col-sm-24.ant-col-md-14.ant-col-lg-14.ant-col-xl-14 > div > div > div > div > div:nth-child(4) > div > span"
-
-            await WebDriverWait(self.driver, 7).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, _renewal_cost_selector)
-                )
-            )
-            await asyncio.sleep(2)
-            await logger.debug(
-                self.pid,
-                f"Renewal page loaded successfully for {self.line.name}.",
-            )
-
-            # Extracting renewal cost and date
-            self.renewal_cost = float(
-                self.driver.find_element(
-                    By.CSS_SELECTOR, _renewal_cost_selector
-                ).text.replace(",", "")
-            )
-            renewal_date_element = self.driver.find_element(
-                By.CSS_SELECTOR, _renewal_date_selector
-            ).text
-            await self._set_renewal_date(renewal_date_element)
-
-            await logger.info(
-                self.pid,
-                f"Extracted renewal cost and date for {self.line.name} - Renewal Cost: {self.renewal_cost}, Renewal Date: {self.renewal_date}, Remaining Days: {self.remaining_days}",
-            )
-            self.succeed = True
-            return True
-        except Exception as e:
-            await logger.error(
-                self.pid,
-                f"Error extracting renewal page for {self.line.name}: {e}",
-            )
-            return False
-
-    async def _set_renewal_date(self, renewal_date_element: str):
-        await logger.debug(
-            self.pid, f"Setting renewal date for {self.line.name}."
-        )
-        try:
-            if renewal_date_element:
-                match = re.search(
-                    r"Renewal Date: (\d{2}-\d{2}-\d{4}), (\d+) Remaining Days",
-                    renewal_date_element,
-                )
-                if match:
-                    self.renewal_date = match.group(1)
-                    self.remaining_days = int(match.group(2))
-        except Exception as e:
-            await logger.error(
-                self.pid,
-                f"Error setting renewal date for {self.line.name}: {e}",
-            )
 
     async def _calc_used_perc(self, used: float, remaining: float) -> float:
+        """Calculate usage percentage"""
         try:
             total = used + remaining
-            return (used / total) * 100
+            return round((used / total) * 100, 2) if total > 0 else 0.0
         except ZeroDivisionError:
-            await logger.error(
-                self.pid,
-                f"Division by zero error for {self.line.name}. Used: {used}, Remaining: {remaining}",
+            logger.error(
+                f"Division by zero error for {self.line.name}. Used: {used}, Remaining: {remaining}"
             )
             return 0.0
+
+    async def _calc_remaining_days(self, date_str: str) -> int:
+        """Calculate remaining days from Arabic date string"""
+        try:
+            # Arabic month mapping
+            arabic_months = {
+                "يناير": 1,
+                "فبراير": 2,
+                "مارس": 3,
+                "أبريل": 4,
+                "مايو": 5,
+                "يونيو": 6,
+                "يوليو": 7,
+                "أغسطس": 8,
+                "سبتمبر": 9,
+                "أكتوبر": 10,
+                "نوفمبر": 11,
+                "ديسمبر": 12,
+            }
+
+            # Parse date string (e.g., "22 أكتوبر 2025")
+            parts = date_str.split()
+            day = int(parts[0])
+            month = arabic_months.get(parts[1], 1)
+            year = int(parts[2])
+
+            # Create target date
+            target_date = datetime(year, month, day)
+            today = datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+
+            # Calculate difference
+            diff = (target_date - today).days
+            return max(0, diff)  # Return 0 if negative
+
+        except Exception as e:
+            logger.error(
+                f"Error calculating remaining days for {self.line.name}: {e}"
+            )
+            return 0

@@ -2,6 +2,7 @@
 import logging
 from typing import List, Optional
 
+from app.quota_checker.orange import OrangeWebScraper
 from app.quota_checker.we import WEWebScraper
 from db.database import get_session
 from db.model import Line, QuotaResult
@@ -28,27 +29,45 @@ class QuotaService:
             Saved QuotaResult or None if failed
         """
         try:
-            # Scrape the data
-            if line.isp_id in [1, 2]:  # WE ISP
-                async with WEWebScraper(line, headless) as scraper:
-                    await scraper.login()
-                    await scraper.scrap_overview_page()
-                    await scraper.scrap_renewaldate_page()
+            # Map ISP ID to scraper class
+            scraper_map = {
+                1: WEWebScraper,
+                2: OrangeWebScraper,
+            }
 
-                # Save to database
-                async with get_session() as session:
-                    quota_model = QuotaResultModel(session)
-                    result = await quota_model.create(scraper.result)
-                    logger.info(
-                        f"Successfully saved quota result for {line.name} "
-                        f"with ID {result.id}"
-                    )
-                    return result
-            else:
+            # Get appropriate scraper class
+            scraper_class = scraper_map.get(line.isp_id)
+
+            if not scraper_class:
                 logger.warning(
                     f"Unsupported ISP ID {line.isp_id} for {line.name}"
                 )
                 return None
+
+            # Scrape the data
+            async with scraper_class(line, headless) as scraper:
+                if not await scraper.login():
+                    logger.error(f"Login failed for {line.name}")
+                    return None
+
+                # WE ISP uses different page methods
+                if line.isp_id == 1:
+                    await scraper.scrap_overview_page()
+                    await scraper.scrap_renewaldate_page()
+                # Orange ISP uses different page methods
+                elif line.isp_id == 2:
+                    await scraper.scrap_balance_page()
+                    await scraper.scrap_internet_page()
+
+            # Save to database
+            async with get_session() as session:
+                quota_model = QuotaResultModel(session)
+                result = await quota_model.create(scraper.result)
+                logger.info(
+                    f"Successfully saved quota result for {line.name} "
+                    f"with ID {result.id}"
+                )
+                return result
 
         except Exception as e:
             logger.error(f"Error scraping quota for {line.name}: {e}")

@@ -4,10 +4,16 @@ from datetime import datetime
 import pytz
 from sqlmodel import Field, Relationship, SQLModel
 
+from core.encryption import CredentialEncryption
+
 
 def cairo_now():
     """Get current time in Cairo timezone."""
     return datetime.now(tz=pytz.timezone("Africa/Cairo"))
+
+
+# Initialize encryption for credentials
+crypto = CredentialEncryption()
 
 
 # ------------------------------------------------------------------------------
@@ -58,6 +64,23 @@ class Line(SQLModel, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
 
+    def set_password(self, plaintext: str):
+        """Encrypt and store password"""
+        self.portal_password = crypto.encrypt(plaintext)
+
+    def get_password(self) -> str:
+        """
+        Decrypt and return password.
+
+        Returns:
+            Decrypted password or original password if not encrypted
+        """
+        # Check if password is already encrypted (Fernet tokens start with 'gAAAAA')
+        if self.portal_password and self.portal_password.startswith("gAAAAA"):
+            return crypto.decrypt(self.portal_password)
+        # Return as-is if not encrypted (for backward compatibility)
+        return self.portal_password
+
     def __repr__(self) -> str:
         return f"Line(id={self.id!r}, name={self.name!r}, description={self.description!r})"
 
@@ -73,7 +96,6 @@ class QuotaResult(SQLModel, table=True):
     __tablename__ = "quota_results"
 
     id: int | None = Field(default=None, primary_key=True)
-    process_id: str = Field(index=True)
     line_id: int = Field(foreign_key="lines.id")
     data_used: int | None = None
     usage_percentage: int | None = None
@@ -88,7 +110,7 @@ class QuotaResult(SQLModel, table=True):
     line: "Line" = Relationship(back_populates="quota_results")
 
     def __repr__(self):
-        return f"QuotaResult(id={self.id!r}, line_id={self.line_id!r}, process_id={self.process_id!r})"
+        return f"QuotaResult(id={self.id!r}, line_id={self.line_id!r})"
 
 
 # ------------------------------------------------------------------------------
@@ -102,7 +124,6 @@ class SpeedTestResult(SQLModel, table=True):
     __tablename__ = "speed_test_results"
 
     id: int | None = Field(default=None, primary_key=True)
-    process_id: str = Field(index=True)
     line_id: int = Field(foreign_key="lines.id")
     ping: int | None = None
     upload_speed: int | None = None
@@ -114,7 +135,7 @@ class SpeedTestResult(SQLModel, table=True):
     line: "Line" = Relationship(back_populates="speed_test_results")
 
     def __repr__(self):
-        return f"SpeedTestResult(id={self.id!r}, line_id={self.line_id!r}, process_id={self.process_id!r})"
+        return f"SpeedTestResult(id={self.id!r}, line_id={self.line_id!r})"
 
 
 # ------------------------------------------------------------------------------
@@ -132,25 +153,7 @@ class Email(SQLModel, table=True):
 
 
 # ------------------------------------------------------------------------------
-# Log Model
+# Log Model - REMOVED
 # ------------------------------------------------------------------------------
-
-
-class Log(SQLModel, table=True):
-    """Application log model"""
-
-    __tablename__ = "logs"
-
-    id: int | None = Field(default=None, primary_key=True)
-    process_id: str | None = Field(default=None, max_length=50, index=True)
-    function: str | None = None
-    level: str | None = None
-    message: str | None = None
-    created_date: datetime = Field(default_factory=cairo_now)
-
-    def __repr__(self):
-        return (
-            f"Log(id={self.id!r}, process_id={self.process_id!r}, "
-            f"level={self.level!r}, message={self.message!r}, "
-            f"created_date={self.created_date!r})"
-        )
+# Database logging has been replaced with file-based logging.
+# See core/logging_config.py for the new logging implementation.

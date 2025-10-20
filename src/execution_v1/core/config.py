@@ -27,6 +27,7 @@ class EmailSettings(BaseSettings):
     port: int
     username: str
     password: SecretStr
+    sender: str  # Added: Sender email address
     sender_alias: str
     cc_address: str
 
@@ -38,11 +39,44 @@ class EmailSettings(BaseSettings):
     )
 
 
+class ExecutionSettings(BaseSettings):
+    """Execution control settings"""
+    semaphore_limit: int = 2
+    max_retry_attempts: int = 1
+
+    model_config = SettingsConfigDict(
+        env_prefix="EXEC_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+
+class SpeedTestSettings(BaseSettings):
+    """Speed test configuration"""
+    download_chunk_size: int = 102400  # 100KB
+    upload_chunk_size: int = 4194304   # 4MB
+    test_count: int = 10
+    latency_test_count: int = 3
+    timeout: int = 30
+    max_download_time: int = 15
+    max_upload_time: int = 10
+
+    model_config = SettingsConfigDict(
+        env_prefix="SPEEDTEST_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
     database: DatabaseSettings = DatabaseSettings()
     email: EmailSettings = EmailSettings()
+    execution: ExecutionSettings = ExecutionSettings()
+    speedtest: SpeedTestSettings = SpeedTestSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -7,10 +7,10 @@ class ResultSchema(BaseModel):
     name: str
     isp: str
     description: str
-    download: int | None = None
-    upload: int | None = None
+    download: float | None = None
+    upload: float | None = None
     used: int | None = None
-    usage_perc: int | None = None
+    usage_percentage: int | None = None
     remaining: int | None = None
     renewal_date: str | None = None
     balance: int | None = None
