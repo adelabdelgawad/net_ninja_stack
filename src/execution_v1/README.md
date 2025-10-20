@@ -16,7 +16,27 @@ Automated network monitoring tool for Egyptian ISP connections with quota tracki
 
 ## Quick Start
 
-### Installation
+### Option 1: Executable (Recommended)
+
+1. **Download the latest release**
+   - Download `NetNinja-v2.0.zip` from [Releases](../../releases)
+   - Extract the ZIP file to your preferred location
+
+2. **Configure environment**
+   - Open `.env.example` file
+   - Edit with your SMTP, database, and other settings
+   - Save as `.env` (remove the .example extension)
+
+3. **Run the application**
+   - Double-click `netninja.exe` or run from command line
+   - On first run, database and encryption key will be created automatically
+   - Use `netninja.exe --setup-db` to initialize database only
+
+4. **Add ISP lines**
+   - Use included setup tool or database management tool
+   - Portal credentials will be automatically encrypted
+
+### Option 2: From Source
 
 1. **Clone the repository**
    ```bash
@@ -44,27 +64,36 @@ Automated network monitoring tool for Egyptian ISP connections with quota tracki
 
 ### Basic Usage
 
+**For Executable:**
 ```bash
 # Run all checks in headless mode
-python main.py --headless
+netninja.exe --headless
 
 # Check quota only (skip speed test)
-python main.py --quota-only --headless
+netninja.exe --quota-only --headless
 
 # Run speed test only
-python main.py --speedtest-only
+netninja.exe --speedtest-only
 
 # Save report to file (no email)
-python main.py --output report.html --no-email
+netninja.exe --output report.html --no-email
 
 # Show last results
-python main.py --show-results
+netninja.exe --show-results
 
 # List configured lines
-python main.py --list-lines
+netninja.exe --list-lines
 
 # Dry run (show what would execute)
-python main.py --dry-run
+netninja.exe --dry-run
+```
+
+**For Source:**
+```bash
+# Replace 'netninja.exe' with 'python main.py' in all commands above
+python main.py --headless
+python main.py --show-results
+# ... etc
 ```
 
 ## Configuration
@@ -188,12 +217,17 @@ execution_v1/
 ### Encryption Key Management
 
 ```bash
-# Key is auto-generated on first run
+# Key is auto-generated on first password encryption
 python main.py --headless
 
 # Backup your encryption key
 cp .secret.key .secret.key.backup
 ```
+
+**Important Notes:**
+- If you delete the database and create a new one, the old `.secret.key` is automatically deleted
+- A new encryption key is generated when you first add lines with passwords
+- Always backup `.secret.key` before deleting the database if you need to recover passwords
 
 ## Logs
 
@@ -219,10 +253,17 @@ cp .secret.key .secret.key.backup
 ### Database Issues
 
 ```bash
-# Reinitialize database (WARNING: deletes all data)
+# Reinitialize database (WARNING: deletes all data and encryption key)
 rm app.db
 python main.py --setup-db
+
+# The above will automatically:
+# 1. Delete the old .secret.key file
+# 2. Create a new database
+# 3. Generate a new encryption key on first password entry
 ```
+
+**Note:** When you delete the database, the encryption key is also removed for a completely fresh start.
 
 ## CLI Reference
 
