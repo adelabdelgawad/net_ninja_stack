@@ -1,2 +1,0 @@
-"# NetNinja" 
-# net-ninja
