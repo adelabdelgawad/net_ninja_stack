@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s \"E:\\github_repositories\\net-ninja\\src\\execution_v1\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

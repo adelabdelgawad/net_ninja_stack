@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Table</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .table-container {
+            margin: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #ffa500;
+            color: white;
+            text-align: center;
+        }
+
+        .header-row th {
+            text-align: center;
+        }
+
+        .data-row td {
+            text-align: center;
+        }
+
+        .high-usage {
+            background-color: #ffcccc !important;
+            /* light red */
+        }
+
+        .low-balance {
+            background-color: #ffeb99 !important;
+            /* light yellow */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr class="header-row">
+                    <th colspan="4">Line Information</th>
+                    <th colspan="2">Speedtest</th>
+                    <th colspan="4">Quota Results</th>
+                </tr>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>ISP</th>
+                    <th>Description</th>
+                    <th>Download</th>
+                    <th>Upload</th>
+                    <th>Used</th>
+                    <th>Remaining</th>
+                    <th>Renewal Date</th>
+                    <th>Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data %}
+                    {% set usage_perc = item.usage_perc if item.usage_perc is not none else 0 %}
+            
+                    <tr class="data-row" 
+                        style="{% if usage_perc > 90 %}background-color: #ffcccc;{% elif usage_perc > 75 %}background-color: #ffeb99;{% endif %}">
+                        <td>{{ item.number if item.number is not none else '' }}</td>
+                        <td>{{ item.name if item.name is not none else '' }}</td>
+                        <td>{{ item.isp if item.isp is not none else '' }}</td>
+                        <td>{{ item.description if item.description is not none else '' }}</td>
+                        <td>
+                            {% if item.download is not none and item.download > 0 %}
+                                {{ item.download }} Mbps
+                            {% else %}
+                                {{ item.download if item.download is not none else '' }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.upload is not none and item.upload > 0 %}
+                                {{ item.upload }} Mbps
+                            {% else %}
+                                {{ item.upload if item.upload is not none else '' }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.usage_perc is not none and item.usage_perc > 0 %}
+                                {{ item.used if item.used is not none else '' }} ({{ item.usage_perc }}%)
+                            {% else %}
+                                {{ item.used if item.used is not none else '' }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.remaining is not none and item.remaining > 0 %}
+                                {{ item.remaining }} GB
+                            {% else %}
+                                {{ item.remaining if item.remaining is not none else '' }}
+                            {% endif %}
+                        </td>
+                        <td>{{ item.renewal_date if item.renewal_date is not none else '' }}</td>
+                        <td>
+                            {% if item.balance is not none and item.balance > 0 %}
+                                {{ item.balance }} LE
+                            {% else %}
+                                {{ item.balance if item.balance is not none else '' }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            
+            
+
+
+
+        </table>
+    </div>
+</body>
+
+</html>
