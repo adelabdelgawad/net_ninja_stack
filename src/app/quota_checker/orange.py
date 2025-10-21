@@ -9,7 +9,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium_async import Options, launch
 
 from app.wait import WebDriverWait
-from core.scraper_config import orange_selectors, timeouts
+from core.scraper_config import timeouts
 from db.model import Line, QuotaResult
 
 logger = logging.getLogger(__name__)

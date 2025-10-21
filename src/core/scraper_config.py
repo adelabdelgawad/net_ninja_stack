@@ -1,4 +1,3 @@
-# core/scraper_config.py
 from pydantic import BaseModel
 
 
