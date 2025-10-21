@@ -6,7 +6,7 @@ from app.quota_checker.orange import OrangeWebScraper
 from app.quota_checker.we import WEWebScraper
 from db.database import get_session
 from db.model import Line, QuotaResult
-from db.models import QuotaResultModel
+from db.models.quota_result_model import QuotaResultModel
 
 logger = logging.getLogger(__name__)
 
@@ -30,34 +30,24 @@ class QuotaService:
         """
         try:
             # Map ISP ID to scraper class
-            scraper_map = {
-                1: WEWebScraper,
-                2: OrangeWebScraper,
-            }
-
-            # Get appropriate scraper class
-            scraper_class = scraper_map.get(line.isp_id)
-
-            if not scraper_class:
+            if line.isp_id == 1:
+                async with WEWebScraper(line, headless) as scraper:
+                    if not await scraper.login():
+                        logger.error(f"Login failed for {line.name}")
+                        return None
+                    await scraper.scrap_overview_page()
+                    await scraper.scrap_renewaldate_page()
+                async with OrangeWebScraper(line, headless) as scraper:
+                    if not await scraper.login():
+                        logger.error(f"Login failed for {line.name}")
+                        return None
+                    await scraper.scrap_balance_page()
+                    await scraper.scrap_internet_page()
+            else:
                 logger.warning(
                     f"Unsupported ISP ID {line.isp_id} for {line.name}"
                 )
                 return None
-
-            # Scrape the data
-            async with scraper_class(line, headless) as scraper:
-                if not await scraper.login():
-                    logger.error(f"Login failed for {line.name}")
-                    return None
-
-                # WE ISP uses different page methods
-                if line.isp_id == 1:
-                    await scraper.scrap_overview_page()
-                    await scraper.scrap_renewaldate_page()
-                # Orange ISP uses different page methods
-                elif line.isp_id == 2:
-                    await scraper.scrap_balance_page()
-                    await scraper.scrap_internet_page()
 
             # Save to database
             async with get_session() as session:

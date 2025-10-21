@@ -26,9 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # SQLite database path
-db_path = Path(
-    settings.database.name if hasattr(settings.database, "name") else "app.db"
-)
+db_path = Path("app.db")
 
 # SQLite connection URLs
 SYNC_DB_URL = f"sqlite:///{db_path}"

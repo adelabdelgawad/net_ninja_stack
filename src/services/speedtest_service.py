@@ -5,7 +5,7 @@ from typing import Optional
 from app.async_speedtest import AsyncSpeedtest
 from db.database import get_session
 from db.model import Line, SpeedTestResult
-from db.models import SpeedTestResultModel
+from db.models.speed_test_result_model import SpeedTestResultModel
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,9 @@ class SpeedTestService:
                 download = round(st.download * 8 / (1024 * 1024), 2)
                 upload = round(st.upload * 8 / (1024 * 1024), 2)
             else:
-                logger.error(f"Could not connect to Ookla's Servers for {line.name}")
+                logger.error(
+                    f"Could not connect to Ookla's Servers for {line.name}"
+                )
         finally:
             # Save result regardless of success/failure
             result = SpeedTestResult(

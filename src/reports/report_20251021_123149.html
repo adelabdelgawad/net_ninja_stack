@@ -1,0 +1,118 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Line Results Report</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f5f5f5; 
+        }
+        .table-container { 
+            margin: 20px auto; 
+            max-width: 1400px; 
+            background-color: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        h1 { 
+            color: #333; 
+            text-align: center; 
+            margin-bottom: 20px; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        th, td { 
+            border: 1px solid #dddddd; 
+            text-align: center; 
+            vertical-align: middle;
+            padding: 12px; 
+        }
+        th { 
+            background-color: #ffa500; 
+            color: white; 
+            font-weight: bold; 
+        }
+        .header-row th { 
+            text-align: center; 
+            vertical-align: middle;
+        }
+        .data-row td { 
+            text-align: center; 
+            vertical-align: middle;
+        }
+        /* High usage: > 90% - Red background */
+        tr.high-usage td { 
+            background-color: #ffcccc !important; 
+        }
+        /* Medium usage: 75-90% - Yellow background */
+        tr.medium-usage td { 
+            background-color: #ffeb99 !important; 
+        }
+        /* Normal usage: < 75% - White background */
+        tr.normal-usage td { 
+            background-color: #ffffff !important; 
+        }
+        /* Hover effect */
+        tbody tr:hover td { 
+            opacity: 0.8; 
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="table-container">
+        <h1>Internet Lines Usage Report</h1>
+        <table>
+            <thead>
+                <tr class="header-row">
+                    <th colspan="4">Line Information</th>
+                    <th colspan="2">Speed Test</th>
+                    <th colspan="5">Quota & Balance</th>
+                </tr>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>ISP</th>
+                    <th>Description</th>
+                    <th>Download (Mbps)</th>
+                    <th>Upload (Mbps)</th>
+                    <th>Used</th>
+                    <th>Usage %</th>
+                    <th>Remaining (GB)</th>
+                    <th>Renewal Date</th>
+                    <th>Balance (LE)</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                    
+                    
+                        
+                    
+                    <tr class="data-row normal-usage">
+                        <td>035415341</td>
+                        <td>VDSL-70</td>
+                        <td>WE</td>
+                        <td>VDSL-70</td>
+                        <td>0.0</td>
+                        <td>0.0</td>
+                        <td>372</td>
+                        <td><strong>36.0%</strong></td>
+                        <td>656</td>
+                        <td>11-11-2025</td>
+                        <td>0.01</td>
+                    </tr>
+                
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

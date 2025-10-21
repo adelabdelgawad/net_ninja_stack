@@ -3,7 +3,7 @@ from typing import List
 
 from db.database import get_session
 from db.model import Line
-from db.models import LineModel
+from db.models.line_model import LineModel
 
 
 class LineService:

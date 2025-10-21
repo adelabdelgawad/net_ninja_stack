@@ -7,8 +7,8 @@ import icecream
 
 from app.mail import send_email
 from db.database import get_session
-from db.model import QuotaResult
-from db.models import EmailModel
+from db.models.email_model import EmailModel
+from db.models.quota_result_model import QuotaResultModel
 from services.report_service import ReportService
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class NotificationService:
     async def send_daily_report(
         subject: str,
         sender: str,
-        data: List[QuotaResult],
+        data: List[QuotaResultModel],
         max_retries: int = 3,
     ) -> bool:
         """

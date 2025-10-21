@@ -4,7 +4,8 @@ from typing import List
 
 from db.database import get_session
 from db.model import Line
-from db.models import QuotaResultModel, SpeedTestResultModel
+from db.models.quota_result_model import QuotaResultModel
+from db.models.speed_test_result_model import SpeedTestResultModel
 from services.line_service import LineService
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,9 @@ async def show_results_command():
                 else "-"
             )
             upload = (
-                f"{speed.upload_speed}Mbps" if speed and speed.upload_speed else "-"
+                f"{speed.upload_speed}Mbps"
+                if speed and speed.upload_speed
+                else "-"
             )
             ping = f"{speed.ping}ms" if speed and speed.ping else "-"
 

@@ -2,23 +2,6 @@ from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class DatabaseSettings(BaseSettings):
-    """Database configuration settings."""
-
-    username: str
-    password: SecretStr
-    server: str
-    port: int = 1433
-    name: str
-
-    model_config = SettingsConfigDict(
-        env_prefix="DATABASE_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-
 class EmailSettings(BaseSettings):
     """Email configuration settings."""
 
@@ -41,6 +24,7 @@ class EmailSettings(BaseSettings):
 
 class ExecutionSettings(BaseSettings):
     """Execution control settings"""
+
     semaphore_limit: int = 2
     max_retry_attempts: int = 1
 
@@ -48,14 +32,15 @@ class ExecutionSettings(BaseSettings):
         env_prefix="EXEC_",
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
 
 class SpeedTestSettings(BaseSettings):
     """Speed test configuration"""
+
     download_chunk_size: int = 102400  # 100KB
-    upload_chunk_size: int = 4194304   # 4MB
+    upload_chunk_size: int = 4194304  # 4MB
     test_count: int = 10
     latency_test_count: int = 3
     timeout: int = 30
@@ -66,14 +51,13 @@ class SpeedTestSettings(BaseSettings):
         env_prefix="SPEEDTEST_",
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
 
 class Settings(BaseSettings):
     """Main application settings."""
 
-    database: DatabaseSettings = DatabaseSettings()
     email: EmailSettings = EmailSettings()
     execution: ExecutionSettings = ExecutionSettings()
     speedtest: SpeedTestSettings = SpeedTestSettings()

@@ -13,7 +13,7 @@ class ResultSchema(BaseModel):
     usage_percentage: int | None = None
     remaining: int | None = None
     renewal_date: str | None = None
-    balance: int | None = None
+    balance: float | None = None
 
     class Config:
         from_attributes = True

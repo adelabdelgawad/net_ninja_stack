@@ -10,9 +10,7 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 # SQLite database path
-db_path = Path(
-    settings.database.name if hasattr(settings.database, "name") else "app.db"
-)
+db_path = Path( "app.db")
 
 # For SQLite, use aiosqlite driver
 database_url = f"sqlite+aiosqlite:///{db_path}"

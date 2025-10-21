@@ -8,7 +8,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium_async import Options, launch
 
 from app.wait import WebDriverWait
-from core.scraper_config import timeouts, we_selectors
 from db.model import Line, QuotaResult
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ class WEWebScraper:
         self.used = None
         self.remaining = None
         self.balance = None
-        self.used_perc = None
+        self.usage_percentage = None
         self.renewal_date = None
         self.remaining_days = None
         self.renewal_cost = None
@@ -49,16 +48,17 @@ class WEWebScraper:
         return self
 
     async def __aexit__(self, *args, **kwargs):
-        logger.info(f"Closing browser for {self.line.name}")
+        logger.info(f"Closing browser for {self.line.name}.")
         self.driver.quit()
         if not self.succeed:
-            logger.warning(f"Scraping failed for {self.line.name}")
+            logger.warning(f"Scraping failed for {self.line.name}.")
             if self.line not in self.failed_list:
                 self.failed_list.append(self.line)
+
         self.result = QuotaResult(
             line_id=self.line.id,
             data_used=self.used,
-            usage_percentage=self.used_perc,
+            usage_percentage=self.usage_percentage,
             data_remaining=self.remaining,
             balance=self.balance,
             renewal_date=self.renewal_date,
@@ -68,119 +68,131 @@ class WEWebScraper:
 
     async def login(self) -> bool:
         try:
-            logger.info(f"Logging in for {self.line.name}")
+            logger.info(f"Logging in for {self.line.name}.")
             self.driver.get("https://my.te.eg/user/login")
-            await WebDriverWait(self.driver, timeouts.login_wait).until(
+            await WebDriverWait(self.driver, 5).until(
                 EC.presence_of_element_located(
-                    (By.ID, we_selectors.login_id)
+                    (By.ID, "login_loginid_input_01")
                 )
             )
 
             # Input credentials
-            self.driver.find_element(By.ID, we_selectors.login_id).click()
+            self.driver.find_element(By.ID, "login_loginid_input_01").click()
             self.driver.find_element(
-                By.ID, we_selectors.login_id
+                By.ID, "login_loginid_input_01"
             ).send_keys(self.line.portal_username)
-            self.driver.find_element(By.ID, we_selectors.login_type).click()
+            self.driver.find_element(By.ID, "login_input_type_01").click()
             self.driver.find_element(
                 By.CSS_SELECTOR,
-                we_selectors.account_type_selector,
+                ".ant-select-item-option-active .ant-space-item:nth-child(2) > span",
             ).click()
-            self.driver.find_element(By.ID, we_selectors.login_password).click()
+            self.driver.find_element(By.ID, "login_password_input_01").click()
             self.driver.find_element(
-                By.ID, we_selectors.login_password
-            ).send_keys(self.line.get_password())  # Use decrypted password
-            self.driver.find_element(By.ID, we_selectors.login_button).click()
-            await asyncio.sleep(timeouts.post_action_delay)
-            logger.info(f"{self.line.name} logged in successfully")
+                By.ID, "login_password_input_01"
+            ).send_keys(self.line.get_password())
+            self.driver.find_element(By.ID, "login-withecare").click()
+            await asyncio.sleep(0.5)
+            logger.info(f"{self.line.name} logged in successfully.")
             return True
         except Exception as e:
             logger.error(f"Login failed for {self.line.name}: {e}")
             return False
 
     async def scrap_overview_page(self) -> bool:
-        logger.info(f"Navigating to overview page for {self.line.name}")
+        logger.info(f"Navigating to overview page for {self.line.name}.")
         await asyncio.sleep(1)  # Adjust based on observed page load times
         try:
             self.driver.get("https://my.te.eg/offering/overview")
-            await asyncio.sleep(timeouts.post_action_delay)
+            await asyncio.sleep(0.5)
+            _balance_selector = "#_bes_window > main > div > div > div.ant-row > div:nth-child(2) > div > div > div > div > div:nth-child(3) > div:nth-child(1)"
+            _used_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-24 > div > div > div.ant-row.ec_accountoverview_primaryBtn_Qyg-Vp > div:nth-child(2) > div > div > div.slick-list > div > div.slick-slide.slick-active.slick-current > div > div > div > div > div:nth-child(2) > div:nth-child(2) > span:nth-child(1)"
+            _remaining_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-24 > div > div > div.ant-row.ec_accountoverview_primaryBtn_Qyg-Vp > div:nth-child(2) > div > div > div.slick-list > div > div.slick-slide.slick-active.slick-current > div > div > div > div > div:nth-child(2) > div:nth-child(1) > span:nth-child(1)"
 
-            await WebDriverWait(self.driver, timeouts.page_load_wait).until(
+            await WebDriverWait(self.driver, 7).until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, we_selectors.balance)
+                    (By.CSS_SELECTOR, _balance_selector)
                 )
             )
-            logger.debug(f"Overview page loaded successfully for {self.line.name}")
+            logger.debug(
+                f"Overview page loaded successfully for {
+                         self.line.name}."
+            )
 
-            await asyncio.sleep(timeouts.element_wait)
+            await asyncio.sleep(2)
 
             # Extracting values from the page
             self.balance = self.driver.find_element(
-                By.CSS_SELECTOR, we_selectors.balance
+                By.CSS_SELECTOR, _balance_selector
             ).text.replace(",", "")
             self.used = float(
                 self.driver.find_element(
-                    By.CSS_SELECTOR, we_selectors.data_used
+                    By.CSS_SELECTOR, _used_selector
                 ).text.replace(",", "")
             )
             self.remaining = float(
                 self.driver.find_element(
-                    By.CSS_SELECTOR, we_selectors.data_remaining
+                    By.CSS_SELECTOR, _remaining_selector
                 ).text.replace(",", "")
             )
-            self.used_perc = await self._calc_used_perc(
+            self.usage_percentage = await self._calc_usage_percentage(
                 self.used, self.remaining
             )
-
             logger.info(
-                f"Extracted values for {self.line.name} - Balance: {self.balance}, Used: {self.used}, Remaining: {self.remaining}, Usage Percentage: {self.used_perc}%"
+                f"Extracted values for {self.line.name} - Balance: {self.balance}, Used: {
+                    self.used}, Remaining: {self.remaining}, Usage Percentage: {self.usage_percentage}%"
             )
             self.succeed = True
             return True
         except Exception as e:
             logger.error(
-                f"Error extracting overview page for {self.line.name}: {e}"
+                f"Error extracting overview page for {
+                         self.line.name}: {e}"
             )
             return False
 
-    async def scrap_renewaldate_page(self) -> bool:
-        logger.info(f"Navigating to renewal page for {self.line.name}")
+    async def scrap_renewal_date_page(self) -> bool:
+        logger.info(f"Navigating to renewal page for {self.line.name}.")
 
         try:
             self.driver.get("https://my.te.eg/echannel/#/overview")
+            _renewal_cost_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-xs-24.ant-col-sm-24.ant-col-md-14.ant-col-lg-14.ant-col-xl-14 > div > div > div > div > div:nth-child(3) > div > span:nth-child(2) > div > div:nth-child(1)"
+            _renewal_date_selector = "#_bes_window > main > div > div > div.ant-row > div.ant-col.ant-col-xs-24.ant-col-sm-24.ant-col-md-14.ant-col-lg-14.ant-col-xl-14 > div > div > div > div > div:nth-child(4) > div > span"
 
-            await WebDriverWait(self.driver, timeouts.page_load_wait).until(
+            await WebDriverWait(self.driver, 7).until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, we_selectors.renewal_cost)
+                    (By.CSS_SELECTOR, _renewal_cost_selector)
                 )
             )
-            await asyncio.sleep(timeouts.element_wait)
-            logger.debug(f"Renewal page loaded successfully for {self.line.name}")
+            await asyncio.sleep(2)
+            logger.debug(
+                f"Renewal page loaded successfully for {self.line.name}."
+            )
 
             # Extracting renewal cost and date
             self.renewal_cost = float(
                 self.driver.find_element(
-                    By.CSS_SELECTOR, we_selectors.renewal_cost
+                    By.CSS_SELECTOR, _renewal_cost_selector
                 ).text.replace(",", "")
             )
             renewal_date_element = self.driver.find_element(
-                By.CSS_SELECTOR, we_selectors.renewal_date
+                By.CSS_SELECTOR, _renewal_date_selector
             ).text
             await self._set_renewal_date(renewal_date_element)
-
             logger.info(
-                f"Extracted renewal cost and date for {self.line.name} - Renewal Cost: {self.renewal_cost}, Renewal Date: {self.renewal_date}, Remaining Days: {self.remaining_days}"
+                f"Extracted renewal cost and date for {self.line.name} - Renewal Cost: {
+                    self.renewal_cost}, Renewal Date: {self.renewal_date}, Remaining Days: {self.remaining_days}",
             )
             self.succeed = True
             return True
         except Exception as e:
             logger.error(
-                f"Error extracting renewal page for {self.line.name}: {e}"
+                f"Error extracting renewal page for {
+                         self.line.name}: {e}"
             )
             return False
 
     async def _set_renewal_date(self, renewal_date_element: str):
-        logger.debug(f"Setting renewal date for {self.line.name}")
+        logger.debug(f"Setting renewal date for {self.line.name}.")
         try:
             if renewal_date_element:
                 match = re.search(
@@ -192,15 +204,19 @@ class WEWebScraper:
                     self.remaining_days = int(match.group(2))
         except Exception as e:
             logger.error(
-                f"Error setting renewal date for {self.line.name}: {e}"
+                f"Error setting renewal date for {
+                         self.line.name}: {e}"
             )
 
-    async def _calc_used_perc(self, used: float, remaining: float) -> float:
+    async def _calc_usage_percentage(
+        self, used: float, remaining: float
+    ) -> float:
         try:
             total = used + remaining
-            return (used / total) * 100
+            return int((used / total) * 100)
         except ZeroDivisionError:
             logger.error(
-                f"Division by zero error for {self.line.name}. Used: {used}, Remaining: {remaining}"
+                f"Division by zero error for {self.line.name}. Used: {
+                    used}, Remaining: {remaining}",
             )
             return 0.0

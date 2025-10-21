@@ -15,11 +15,7 @@ async def check_and_initialize_database() -> bool:
     Returns:
         True if database was newly created, False if it already existed.
     """
-    db_path = Path(
-        settings.database.name
-        if hasattr(settings.database, "name")
-        else "app.db"
-    )
+    db_path = Path("app.db")
 
     if not db_path.exists():
         logger.warning(f"⚠️  Database file not found: {db_path}")
@@ -40,7 +36,9 @@ async def check_and_initialize_database() -> bool:
 
             logger.info("✅ Database initialized successfully!")
             logger.info(f"📁 Database location: {db_path.absolute()}")
-            logger.info("🔑 New encryption key will be generated on first password encryption")
+            logger.info(
+                "🔑 New encryption key will be generated on first password encryption"
+            )
             logger.info(
                 "ℹ️  Please add your ISP lines to the database before running again."
             )
